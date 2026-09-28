@@ -2,6 +2,14 @@
 
 All notable changes to this skill will be documented in this file.
 
+## Unreleased
+
+### Changed
+
+- Repositioned the skill from a generic prohibited-word utility to a publish-time Xiaohongshu safety gate.
+- Strengthened storefront messaging around PASS / FAIL behavior and workflow usage.
+- Clarified the role of the local word list as a single source of truth for larger preflight flows.
+
 ## [1.0.0] - 2026-09-13
 
 ### Added

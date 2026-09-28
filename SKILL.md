@@ -1,11 +1,10 @@
 ---
 name: xiaohongshu-prohibited-words
-description: 小红书违禁词离线检测（单一真相源）。纯本地词库 + 扫描脚本，不依赖付费 API，覆盖免费课程/证书等场景实测限流词 + 通用违禁词。发布前必跑，退出码 0 才可发布。词库带入库/出库维护机制，持续养护不过时。
+description: 发布小红书内容前，先过这一道违禁词闸门。离线词库 + 本地扫描脚本，零依赖、可 fail-closed，用于发布前拦截硬词、识别限流风险，并作为更大 preflight 流程中的词库单一真相源。
 version: 1.0.0
 metadata:
-  short-description: 小红书违禁词离线检测与词库维护
+  short-description: 小红书发布前违禁词闸门（离线）
 ---
-
 # 小红书违禁词离线检测
 
 小红书内容发布前的违禁词闸门。**这是违禁词库的单一真相源**——其他 skill（free-course-share、xiaohongshu-content-workflow 等）需要违禁词检查时，都引用本 skill，不要各自维护一份。

@@ -1,6 +1,11 @@
 ## Description:
 
-xiaohongshu-prohibited-words is an offline prohibited-word detector for Xiaohongshu posts. It provides a local word list and a zero-dependency Python scanner that flags hard-blocked words before publishing, with an in/out maintenance mechanism to keep the list current without over-blocking.
+xiaohongshu-prohibited-words is an offline publish-time safety gate for Xiaohongshu posts. It uses a local word list and a zero-dependency Python scanner to catch hard-blocking wording before release, making it easier to stop risky posts before they are published.
+
+Core value:
+- Offline word-risk scan
+- Clear PASS / FAIL boundary for publishing
+- Canonical word-risk source for larger Xiaohongshu workflows
 
 This skill is ready for commercial/non-commercial use.
 
@@ -14,7 +19,7 @@ MIT
 
 ## Use Case:
 
-Creators and agent users run this skill before publishing Xiaohongshu notes to catch prohibited or sensitive words that could trigger shadow-limiting, takedown, or rejection. It is the single source of truth for the prohibited-word list, shared by free-course-share and xiaohongshu-content-workflow.
+Creators and agent users run this skill before publishing Xiaohongshu notes to catch prohibited or sensitive words that could trigger shadow-limiting, takedown, or rejection. It works both as a standalone checker and as the canonical word-risk layer inside larger Xiaohongshu workflows.
 
 ### Deployment Geography for Use:
 
@@ -24,15 +29,15 @@ China (Xiaohongshu platform)
 
 Risk: A prohibited-word list is never complete, and platform rules change over time.
 
-Mitigation: The word list has an explicit in/out maintenance mechanism (add on verified triggers, downgrade/remove on false positives, prune on rule changes). Re-check before each publish.
+Mitigation: The word list has an explicit in/out maintenance mechanism. Re-check before each publish and update the list with verified trigger evidence.
 
 Risk: Over-blocking legitimate words reduces normal expression space.
 
-Mitigation: The list is graded P0/P1/P2, and only P0 blocks publishing; P1/P2 are advisory. Words are added only with a verified trigger, date, and reproducible scenario.
+Mitigation: The list is graded P0/P1/P2, and only P0 blocks publishing; P1/P2 are advisory.
 
-Risk: The scanner only checks text fields (title/body/tags), not cover image OCR.
+Risk: The scanner checks text fields only, not every possible media surface such as image OCR.
 
-Mitigation: Cover images must be checked separately for OCR-sensitive words; the word list documents which words are especially sensitive in cover OCR.
+Mitigation: Use this as the text-risk gate, and pair it with broader preflight review when image or workflow-level checks are required.
 
 ## Reference(s):
 
@@ -51,8 +56,9 @@ Mitigation: Cover images must be checked separately for OCR-sensitive words; the
 
 ## Skill Version(s):
 
-1.0.0 (source: server release metadata)
+1.0.0
 
 ## Ethical Considerations:
 
-Users should evaluate whether this skill is appropriate for their environment, review any generated or modified files before relying on them, and apply their organization's safety, security, and compliance requirements before deployment.
+Users should review both the scan result and the release context before publishing, and apply their own safety, compliance, and content-governance requirements.
+
