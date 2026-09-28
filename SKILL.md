@@ -1,7 +1,7 @@
 ---
 name: xiaohongshu-prohibited-words
 description: 小红书违禁词离线检测（单一真相源）。纯本地词库 + 扫描脚本，不依赖付费 API，覆盖免费课程/证书等场景实测限流词 + 通用违禁词。发布前必跑，退出码 0 才可发布。词库带入库/出库维护机制，持续养护不过时。
-version: 1.0.0
+version: 1.0.3
 metadata:
   short-description: 小红书违禁词离线检测与词库维护
 ---
@@ -27,16 +27,26 @@ metadata:
 ### 1. 发布前扫描（强制）
 
 ```bash
-# 从物料 md 扫描（只提取「## 标题」+「## 正文」两段，跳过审查记录避免误报）
+# 从物料 md 扫描（只提取「## 标题」+「## 正文」+「## 标签」三段，跳过审查记录避免误报）
 python3 scripts/check_prohibited.py --file 笔记终稿.md
 
 # 或直接传纯发布文案
 python3 scripts/check_prohibited.py "标题" "正文" "标签"
 ```
 
-退出码：`0` = 无 P0 硬词（PASS）；`1` = 有 P0 硬词需改；`2` = 运行错误。
+退出码：`0` = 无 P0 硬词（PASS）；`1` = 有 P0 硬词需改；`2` = 运行错误；`3` = **依赖缺失（fail-closed）**。
 
 **规则：P0 硬词未清空 = 禁止发布。** P1/P2 命中建议顺手改，但不阻塞发布。
+
+> 词库路径默认自动查找。要用别的词库，设环境变量 `XHS_WORDLIST=<路径>` ——
+> **指定了却找不到就是退出码 3，不会静默回落到默认词库**（否则「我换了词库」会变成一句谎话）。
+
+> ⚠️ **这是单项检查（只查词）**，不覆盖标题字数、AI 声明、导流风险。
+> 要一次过完发布前所有关，用 **`xiaohongshu-preflight-check`** —— 那是发布前闸门的**唯一出口**：
+> ```bash
+> python3 ~/.workbuddy/skills/xiaohongshu-preflight-check/scripts/preflight.py --file 笔记终稿.md
+> ```
+> 两者**共用同一份词库与同一套解析**，结论必然一致，不会一个放行一个拦截。
 
 ### 2. 词库维护（入库 / 出库）
 
@@ -65,9 +75,34 @@ python3 scripts/check_prohibited.py "标题" "正文" "标签"
 ## 资源
 
 - `references/prohibited-words.md` — 违禁词库（7 大类：实测硬词/外部平台名/极限词/价格诱导/导流话术/账号禁区词/强制标注项）
+- `references/sections.json` — **段落配置**：哪一段归哪一组、默认什么级别、逐词覆写（改级别只改这里）
+- `scripts/wordlist.py` — **解析与匹配的单一实现**（被本 skill 与 `xiaohongshu-preflight-check` 共用）
 - `scripts/check_prohibited.py` — 离线扫描脚本（纯 stdlib，零依赖）
+  ```bash
+  python3 scripts/check_prohibited.py --file 笔记终稿.md
+  ```
+- `scripts/selftest.sh` — 退出码回归自测（含两条漂移回归用例，改词库后跑一遍）
+  ```bash
+  bash scripts/selftest.sh
+  ```
+
+## 设计约束：词条只有一个来源
+
+`check_prohibited.py` **不内嵌任何词条副本**，运行时从 `references/prohibited-words.md`
+解析；解析逻辑在 `scripts/wordlist.py`，消费方（含 `xiaohongshu-preflight-check`）按同级
+skill 目录载入，不各自复制一份。
+
+**为什么定这条（有事故）**：脚本原先内嵌一份「精简可运行版词库」，靠人工与 md 同步。
+2026-09-19 实测发现两边已经漂移 —— md 里标为 P0 的
+「免费（全文≥2次）」与「答案+PDF+主页群」，脚本**一个都没拦住**，
+而脚本自造的「免费领取」规则又拦了 md 只说 P1 的词。**内嵌副本 = 漂移的来源。**
+
+所以：
+- 加词 / 改级别 → **只改 `prohibited-words.md` 与（必要时）`sections.json`**，脚本不动
+- 词库读不到、`sections.json` 缺失、解析出 0 条规则 → **退出码 3，绝不放行**
 
 ## 引用关系
 
-- 被 `free-course-share` 引用（免费课程/证书笔记发布前必跑）
-- 被 `xiaohongshu-content-workflow` 引用（通用内容生产第 7 步风险检查）
+- 被 `free-course-share` 引用（免费课程/证书笔记发布前）
+- 被 `xiaohongshu-content-workflow` 引用（内容生产流程第 7 步）
+- 被 `xiaohongshu-preflight-check` 引用（发布前闸门：词库 + 解析都从这里载入）

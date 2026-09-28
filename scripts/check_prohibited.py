@@ -1,73 +1,52 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-小红书「免费课程/证书」笔记 离线违禁词扫描器 — free-course-share skill
+小红书「免费课程/证书」笔记 离线违禁词扫描器
 
 不依赖付费 API，纯离线。扫描标题/正文/标签文本，分级输出命中结果。
-词库见 references/prohibited-words.md（本脚本内置一份精简可运行版，二者需保持同步）。
+
+**词库与解析逻辑都来自同级模块 `wordlist.py`**（词库单一真相源在
+`references/prohibited-words.md`，段落级别配置在 `references/sections.json`）。
+本脚本**不再内嵌任何词条副本** —— 内嵌副本正是漂移的来源：2026-09-19 实测发现
+脚本与词库文档已经不一致（文档标为 P0 的「免费（全文≥2次）」与
+「答案+PDF+主页群」，脚本一个都没拦住）。
 
 用法:
   python3 check_prohibited.py "标题文本" "正文文本" "标签文本"
   python3 check_prohibited.py --file 笔记终稿.md    # 从 markdown 提取并扫描
 
-退出码: 0=无P0硬词(PASS)  1=发现P0硬词(需改)  2=运行错误
+退出码: 0=无P0硬词(PASS)  1=发现P0硬词(需改)  2=运行错误  3=依赖缺失(fail-closed)
 """
-import re
 import sys
+from pathlib import Path
 
-# ============ 离线词库（与 references/prohibited-words.md 同步维护）============
-# 每个词条: (正则, 级别, 说明, 替代建议)
-P0_HARD = [
-    (r"白嫖", "P0", "9/12 两次实测触发'仅自己可见'软限流", "直接删，靠结果感钩子"),
-    (r"0\s*元|¥\s*0|零元", "P0", "价格诱导词，封面OCR尤其敏感", "删，免费靠'登录就能学'暗示"),
-    (r"免费(领取|白拿|白送|获得|获取)", "P0", "价格诱导组合", "删或改'登录就能学'"),
-    (r"官方.{0,6}(免费|白嫖).{0,6}(拿证|证书|徽章)", "P0", "'免费+官方+拿证'三词连用触发营销标签", "三词拆开"),
-    (r"答案.{0,4}(合集|PDF|文档).{0,4}(主页群|群|自取)", "P0", "答案+资料+主页群 导流诱导高危", "改'攻略整理成文档，主页可看'"),
-    (r"免费证书|AI证书|免费课程|白嫖快乐", "P0", "营销诱导敏感标签/词", "删，保留中性词"),
-    (r"LinkedIn|领英学习|领英", "P0", "外部平台名，导流站外", "只写出品方"),
-    (r"微信号|vx|卫星|加V|私我|私信我", "P0", "站外导流", "不写，转化走主页简介"),
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import wordlist  # noqa: E402  同目录模块
+
+BUCKETS = [
+    ("P0", "P0 硬词（必改，否则可能限流）"),
+    ("P1", "P1 极限词/营销诱导（建议改）"),
+    ("P2", "P2 账号级禁区词（建议改）"),
 ]
 
-P1_LIMIT = [
-    (r"最(好|佳|优|大|小|便宜|火|安全|强|快|全)", "P1", "极限词，虚假营销", "删或改'更/相对'"),
-    (r"第一|唯一|首家|全网首发|独家|绝无仅有", "P1", "极限词", "删"),
-    (r"100%|百分百|满分|根治|永久|无效退款|一次(搞定|通过)|稳赚|躺赚|秒过|闭眼入", "P1", "绝对化承诺/诱导", "删或改客观描述"),
-    (r"限时(秒杀|抢购)|仅限今日|马上涨价|再不买就没了|点击领|爆单|卖爆|疯抢|亏本甩卖|跳楼价|抄底价", "P1", "价格营销诱导", "删"),
-]
 
-P2_ACCOUNT = [
-    (r"初体验|第一课|入门推荐|课程分享", "P2", "Bonnie账号级禁区词", "删"),
-    (r"我学了", "P2", "'我学了X'句式", "改'我整理了/我实测/我全程中文版'"),
-]
-
-def _extract_section(content, section_name):
+def extract_section(content, section_name):
     """从 markdown 提取指定标题段落内容（到下一个同级标题为止）"""
-    lines = content.split("\n")
-    result = []
-    in_section = False
-    for line in lines:
+    result, in_section = [], False
+    for line in content.split("\n"):
         stripped = line.strip()
         if stripped.startswith("## "):
-            # 进入目标段
             in_section = (stripped[3:].strip() == section_name.lstrip("# ").strip() or
                           stripped.startswith(section_name))
             if in_section:
                 continue
         elif stripped.startswith("# "):
-            # 遇到更高一级标题，退出
             if in_section:
                 break
         if in_section:
             result.append(line)
     return "\n".join(result).strip()
 
-def scan(text, rules):
-    """返回命中列表 [(词, 级别, 说明, 建议)]"""
-    hits = []
-    for pattern, level, why, suggest in rules:
-        for m in re.finditer(pattern, text):
-            hits.append((m.group(0), level, why, suggest))
-    return hits
 
 def main():
     args = sys.argv[1:]
@@ -77,56 +56,77 @@ def main():
 
     title, body, tags = "", "", ""
     if args[0] == "--file":
-        try:
-            with open(args[1], "r", encoding="utf-8") as f:
-                content = f.read()
-            # 只提取「## 标题」和「## 正文」两段，跳过「违禁词审查记录/checklist/发布建议」等元信息段
-            # 否则审查记录里"旧版用了白嫖→已删"这类对照词会被误报
-            title = _extract_section(content, "## 标题")
-            body = _extract_section(content, "## 正文")
-            if not title and not body:
-                # 没找到标准段落，退回整篇（纯文案文件场景）
-                title = body = content
-        except Exception as e:
-            print(f"读取失败: {e}")
+        if len(args) < 2:
+            print("用法: check_prohibited.py --file 笔记.md")
             return 2
+        try:
+            content = Path(args[1]).read_text(encoding="utf-8")
+        except Exception as e:
+            print("读取失败: {0}".format(e))
+            return 2
+        # 只提取「## 标题」「## 正文」「## 标签」三段，跳过「违禁词审查记录/checklist/发布建议」
+        # 等元信息段，否则审查记录里"旧版用了白嫖→已删"这类对照词会被误报
+        title = extract_section(content, "## 标题")
+        body = extract_section(content, "## 正文")
+        tags = extract_section(content, "## 标签")
+        if not title and not body:
+            # 没找到标准段落，退回整篇（纯文案文件场景）
+            title = body = content
     else:
         title = args[0] if len(args) > 0 else ""
         body = args[1] if len(args) > 1 else ""
         tags = args[2] if len(args) > 2 else ""
 
+    try:
+        rules, notices, stats, errors = wordlist.load()
+    except Exception as e:
+        print("✗ 词库加载失败：{0}".format(e), file=sys.stderr)
+        return 3
+    if errors or not rules:
+        for e in (errors or ["词库解析出 0 条可匹配规则"]):
+            print("✗ {0}".format(e), file=sys.stderr)
+        print("✗ fail-closed：拿不到词库就不判定「通过」", file=sys.stderr)
+        return 3
+
     all_text = "\n".join([title, body, tags])
-    hits_p0 = scan(all_text, P0_HARD)
-    hits_p1 = scan(all_text, P1_LIMIT)
-    hits_p2 = scan(all_text, P2_ACCOUNT)
+    hits = wordlist.collect(rules, all_text)
+
+    by_level = {lv: [] for lv, _ in BUCKETS}
+    for h in hits:
+        by_level.setdefault(h["level"], []).append(h)
 
     print("=" * 50)
     print("违禁词离线扫描结果")
     print("=" * 50)
+    print("词库：{0}（载入 {1} 条）".format(wordlist.find_wordlist(), sum(stats.values())))
 
-    def print_hits(label, hits):
-        if hits:
-            print(f"\n【{label}】命中 {len(hits)} 处:")
-            for word, level, why, suggest in hits:
-                print(f"  - [{level}] 「{word}」 → {why}；建议：{suggest}")
+    for level, label in BUCKETS:
+        rows = by_level.get(level, [])
+        if rows:
+            total = sum(r.get("count", 1) for r in rows)
+            print("\n【{0}】命中 {1} 处:".format(label, total))
+            for h in rows:
+                n = h.get("count", 1)
+                times = "（×{0}）".format(n) if n > 1 else ""
+                print("  - [{0}] 「{1}」{2} → {3}；建议：{4}".format(
+                    level, h["matched"], times, h["why"], h["suggest"]))
         else:
-            print(f"\n【{label}】未命中")
+            print("\n【{0}】未命中".format(label))
 
-    print_hits("P0 硬词（必改，否则可能限流）", hits_p0)
-    print_hits("P1 极限词/营销诱导（建议改）", hits_p1)
-    print_hits("P2 账号级禁区词（建议改）", hits_p2)
-
-    # 免费出现次数统计
-    free_count = len(re.findall(r"免费", all_text))
-    print(f"\n[提示] 「免费」全文出现 {free_count} 次（≥2 次建议削减到 1 次）")
+    if notices:
+        print("\n【须逐条核对的平台强制标注项】")
+        for n in notices:
+            print("  - {0}".format(n["text"]))
 
     print("\n" + "=" * 50)
-    if hits_p0:
-        print("结论：❌ 有 P0 硬词，需修改后再发布")
+    p0 = by_level.get("P0", [])
+    if p0:
+        total = sum(r.get("count", 1) for r in p0)
+        print("结论：❌ 有 {0} 处 P0 硬词，需修改后再发布".format(total))
         return 1
-    else:
-        print("结论：✅ 无 P0 硬词，可发布（P1/P2 若命中建议顺手改）")
-        return 0
+    print("结论：✅ 无 P0 硬词，可发布（P1/P2 若命中建议顺手改）")
+    return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
