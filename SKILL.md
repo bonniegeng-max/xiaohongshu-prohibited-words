@@ -1,7 +1,7 @@
 ---
 name: xiaohongshu-prohibited-words
 description: 小红书违禁词离线检测（单一真相源）。纯本地词库 + 扫描脚本，不依赖付费 API，覆盖免费课程/证书等场景实测限流词 + 通用违禁词。发布前必跑，退出码 0 才可发布。词库带入库/出库维护机制，持续养护不过时。
-version: 1.0.3
+version: 1.0.5
 metadata:
   short-description: 小红书违禁词离线检测与词库维护
 ---
@@ -106,3 +106,7 @@ skill 目录载入，不各自复制一份。
 - 被 `free-course-share` 引用（免费课程/证书笔记发布前）
 - 被 `xiaohongshu-content-workflow` 引用（内容生产流程第 7 步）
 - 被 `xiaohongshu-preflight-check` 引用（发布前闸门：词库 + 解析都从这里载入）
+
+## 相关 skill / Related skills
+
+- 表情包出图文案、课程卡文案定稿后，直接丢进来跑一遍（`emoji-sticker-cn` / `free-course-share` 的产出都适用）。发布前过一遍本 skill，是把「被限流/被拒」的成本前移的最便宜动作。

@@ -2,7 +2,7 @@
 
 All notable changes to this skill will be documented in this file.
 
-## [1.0.3] - 2026-09-19  ✅ 已发布
+## [1.0.3] - 2026-09-19  ⚠️ 本地已改，尚未发布
 
 ### Fixed —— 消灭词库副本，修掉已发生的漂移
 
