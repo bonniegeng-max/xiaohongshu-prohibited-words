@@ -1,4 +1,11 @@
 # Changelog
+## 1.0.6 — 2026-11-17
+
+发布面修正，无功能变更。
+
+- **首屏重写**：补语义 tag（转化 0.37% 第二高，被低估最狠）
+- **显示名**：发布时必须带 `--name "小红书违禁词·敏感词·限流词检测（离线）"`（此前未能稳定带中文名）
+- **检索面**：tags 刷新到 1.0.6 并补齐语义 tag（`xiaohongshu,compliance,offline,keyword`）；topics 同步为 `笔记违规,账号违规,违规检测,导流检测,违禁词`
 
 All notable changes to this skill will be documented in this file.
 
